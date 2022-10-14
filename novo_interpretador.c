@@ -86,7 +86,7 @@ El* create_el(int name, int prio, int tempo_init, int tempo_total){
     new->prio = prio;
     new->tempo_init = tempo_init;
     new->tempo_total = tempo_total;
-    new->minha_vez = 0;
+    new->minha_vez = 0; //quando esse elemento e zero, significa que ele pode dar 
     new->tempo_atual = 0;
 
     return new;
@@ -162,6 +162,105 @@ void free_line(Fila* f){
     }
 }
 
+void hands_down(Fila *f){ //abaixa as maos de todos os elementos da linked list
+    while(f!=NULL)
+        f->curr->minha_vez = 0;
+}
+
+void copy_el(El* from, El* to){
+
+    to->name = from->name;
+    to->prio = from->prio;
+    to->tempo_atual = from->tempo_atual;
+    to->tempo_init = from->tempo_init;
+    to->tempo_total = from->tempo_total;
+    to->minha_vez = from->minha_vez;
+
+}
+
+El* find_prio(Fila *RR){// TESTAR || procura pelo proximo elemento da round robin de maior prioridade 
+
+    int high_prio = 0; //maior prioridade encontrada ate entao
+
+    Fila* candidatos; //linked list de todos os candidatos de maiores prioridades 
+    int lever = 0;
+
+    Fila *loop1, *loop2, *loop3, *loop4;
+    loop1 = RR, loop2 = RR;
+    loop3 = candidatos;
+
+    El* escolhido = (El*) malloc(sizeof(El));    
+
+    while(loop1 != NULL){ //procura pela maior prioridade
+        if(loop1->curr->prio > high_prio)
+            high_prio = loop1->curr->prio; 
+        loop1 = loop1->prox;
+    }
+
+    while(loop2 != NULL){//a partir da maior prioridade, cria uma LL de candidatos
+        
+        if(loop2->curr->prio == high_prio){
+            if(lever == 0){
+                candidatos = create_line(loop2->curr);
+                lever++;
+            }
+            else insert_on_line(candidatos,loop2->curr);
+        }
+        loop2 = loop2->prox;
+    }
+
+    while(loop3 != NULL){ //verifica se ha alguem com a mao abaixada (ou seja, se alguem de maior prioridade nao tiver sido selecionado nesta rodada)
+        if(loop3->curr->minha_vez == 0){
+            copy_el(loop3->curr,escolhido); //PODE DAR ERRO || copia o conteudo do no da LL candidatos
+            free_line(candidatos); //libera a LL candidatos
+            return escolhido;
+        }
+        loop3 = loop3->prox;
+    }
+
+    if(loop3 == NULL){
+        printf("ERRO NA FIND PRIO\n");
+        exit(1);
+    }
+
+    hands_down(candidatos); //se todos estiverem com as maos levantadas, abaixa todas elas...
+
+    copy_el(candidatos->curr,escolhido); //... e seleciona o primeiro da LL arbitrariamente || ISSO PODE GERAR RESULTADOS INESPERADOS, PQ EU NAO ESTOU DEFININDO EXATAMENTE QUEM DEVE ENTRAR QUE HORA NO PROGRAMA!!!
+    free_line(candidatos);
+
+    return escolhido;
+}
+
+
+void go_robin(Fila *RR){/* TESTAR || funcao do escalonador efetivamente */
+
+    int pid = fork();
+    El* next;
+    
+    next = find_prio(RR);
+
+    
+    if(pid > 0){ 
+        
+        //da o exec baseado no nome do processo
+        //  este processo pode ja estar sendo executado, entao eu tenho que verificar se ele ja levou um exec;
+        //      se ele ja tiver levado, SIGCONT
+        //      se nao, exec
+        
+        sleep(1); //aguarda 1 segundo 
+        //SIGSTOP
+
+        exit(0); //processo filho fez o programa alvo executar durante 1 segundo, fim de seu proposito
+
+    }else{ //espera pela exec do processo
+        waitpid(pid,0,0);
+    }
+
+
+}
+
+
+
 int main(void){
 
     FILE* f = fopen("input.txt","r");
@@ -213,36 +312,26 @@ int main(void){
 
     El* next; //elemento a ser inserido neste segundo na lista
 
-    if(escalonador == 0){ //interpretador
-        while(runTime != tempoTotalExec){ //CADA ITERACAO REPRESENTA 1 SEGUNDO!!!
-            while(next_off(fila,runTime) != NULL){//enquanto houverem elementos a serem inseridos neste segundo:
-                target = next_off(fila,runTime); //pega o elemento alvo
-                fila = remove_of_line(fila,target); //remove ele da LL
 
-                if(lever == 0){//se nao houver nenhum elemento na RR;
-                    RR = create_line(target);
-                }else{ //se houver ao menos um elemento na RR
-                    insert_on_line(RR,target);
-                }
+    while(runTime != tempoTotalExec){ //CADA ITERACAO REPRESENTA 1 SEGUNDO!!!
+        while(next_off(fila,runTime) != NULL){//enquanto houverem elementos a serem inseridos neste segundo:
+            target = next_off(fila,runTime); //pega o elemento alvo
+            fila = remove_of_line(fila,target); //remove ele da LL
+
+            if(lever == 0){//se nao houver nenhum elemento na RR;
+                RR = create_line(target);
+            }else{ //se houver ao menos um elemento na RR
+                insert_on_line(RR,target);
             }
-
-            sleep(1);
-
-            *runTime++;//+1 segundo
         }
-        /*      faz chamadas ao escalonador         */
 
-        
+        go_robin(RR);
 
-
-        kill(escalonador,SIGCONT); //isso talvez de erro, 
-
-    }else if(escalonador > 0){ //escalonador
-        int mypid = getpid();
-
-        //waitpid para esperar o pai mandar o SIGCONT para o PID do escalonador
         sleep(1);
+
+        *runTime++;//+1 segundo
     }
+        /*      faz chamadas ao escalonador         */
 
     //faz fork, e faz chamadas ao escalonador para ele inserir na paradinha do lance
 
