@@ -3,6 +3,12 @@
 #include <signal.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+#include <sys/stat.h>
+
+#define PATH "./testes/programs/"
 
 /*
 João Victor Godinho Woitschach - 2011401
@@ -124,13 +130,13 @@ Fila* remove_of_line(Fila*f , El* target){// TROCAR PARA O CODIGO MAIn||TESTADO 
             if(ant == NULL){ //o elemento a ser retirado é o primeiro da LL
                 f = f->prox;
                 //printf("hello there! %p\n",buf->curr);
-                free(buf->curr);
-                free(buf);
+                //free(buf->curr);
+                //free(buf);
                 return f;
             }else{
                 ant->prox = buf->prox; // skip 1
-                free(buf->curr);
-                free(buf);
+                //free(buf->curr);
+                //free(buf);
                 return f;
             }
         }
@@ -158,8 +164,8 @@ void free_line(Fila* f){
     while(f!=NULL){
         ref = f;
         f = f->prox;
-        free(ref->curr);
-        free(ref);
+        //free(ref->curr);
+        //free(ref);
     }
 }
 
@@ -224,15 +230,15 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     }
     loop3 = candidatos;
 
-    printf("FILA DE CANDIDATOS: \n");
-    print_line(loop3);
+    //printf("FILA DE CANDIDATOS: \n");
+    //print_line(loop3);
 
     while(loop3 != NULL){ //verifica se ha alguem com a mao abaixada (ou seja, se alguem de maior prioridade nao tiver sido selecionado nesta rodada)
         if(loop3->curr->minha_vez == 0){
 
             copy_el(loop3->curr,escolhido); //PODE DAR ERRO || copia o conteudo do no da LL candidatos
             candidatos = remove_of_line(candidatos,loop3->curr);
-            free_line(candidatos); //libera a LL candidatos
+            //free_line(candidatos); //libera a LL candidatos
             return escolhido;
         }
         loop3 = loop3->prox;
@@ -246,41 +252,85 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     hands_down(candidatos); //se todos estiverem com as maos levantadas, abaixa todas elas...
 
     copy_el(candidatos->curr,escolhido); //... e seleciona o primeiro da LL arbitrariamente || ISSO PODE GERAR RESULTADOS INESPERADOS, PQ EU NAO ESTOU DEFININDO EXATAMENTE QUEM DEVE ENTRAR QUE HORA NO PROGRAMA!!!
-    free_line(candidatos);
+    //free_line(candidatos);
 
-    printf("NOVA FILA RR: \n");
-    print_line(RR);
+    //printf("NOVA FILA RR: \n");
+    //print_line(RR);
 
     return escolhido;
 }
 
+char* program_name(int int_name){
 
-void go_robin(Fila *RR){/* TESTAR || funcao do escalonador efetivamente */
+    char* ponto_barra = (char*) malloc(sizeof(char)*4); //  ./ + null
+    strcpy(ponto_barra, "./");
 
-    int pid = fork();
+    char* numero = (char*) malloc(sizeof(char)*2);
+    numero[0] = int_name + '0';
+    numero[1] = '\0';
+
+    strcpy(ponto_barra,numero);
+    //free(numero);
+
+    return ponto_barra;
+}
+
+int search_name(int* v, int tam, int target){
+
+    for(int i = 0; i<tam; i++)
+        if(v[i] == target)
+            return v[i];
+    return -1; //nao encotrou o nome
+}
+
+int get_index(int *v, int tam, int target){
+
+    for(int i = 0; i<tam; i++)
+        if(v[i] == target)
+            return i;
+    return -1; //nao foi encontrado o nome target
+}
+
+void go_robin(Fila *RR, int* pids, int* p_names, int tam){/* TESTAR || funcao do escalonador efetivamente */
+
     El* next;
-    
+
     next = find_prio(RR);
-    
+    char* to_run = program_name(next->name); // "./<numero_do_programa>"
+    int i = get_index(p_names,tam,next->name);
+    int pid = fork();
 
 
     if(pid > 0){ 
-        
-        //da o exec baseado no nome do processo
-        //  este processo pode ja estar sendo executado, entao eu tenho que verificar se ele ja levou um exec;
-        //      se ele ja tiver levado, SIGCONT
-        //      se nao, exec
-        
-        sleep(1); //aguarda 1 segundo 
-        //SIGSTOP
+        if(pids[i] == 0){ //se o processo, nao tiver sido executado...
+            execlp(to_run,to_run,NULL);
+        }else if(pids[i] > 0){
+            kill(pids[i],SIGCONT);
+        }
 
-        exit(0); //processo filho fez o programa alvo executar durante 1 segundo, fim de seu proposito
-
+        if(next->tempo_atual >= next->tempo_total)
+            kill(pids[i],SIGTERM);
     }else{ //espera pela exec do processo
-        waitpid(pid,0,0);
+        sleep(1); //aguarda 1 segundo
+        kill(pids[i],SIGSTOP);
+        
     }
+}
 
 
+void zero_array(int *v, int tam){ //limpa o lixo de memoria de um array 
+    for(int i = 0; i<tam; i++) v[i] = 0;
+}
+
+void get_names(int* v, Fila* f){ //transfere os nomes da fila para um array de int
+
+    int i = 0;
+
+    while(f != NULL){
+        v[i] = f->curr->name;
+        i++;
+        f = f->prox;
+    }
 }
 
 
@@ -319,18 +369,26 @@ int main(void){
     /*          INICIO DO PROGRAMA            */
 
     int tempoTotalExec = get_tempoExecTotal(fila); //tempo total de execucao de todos os programas, quando esse tempo acabar, finalizar escalonador e o programa 
-    int *runTime = (int*) malloc(sizeof(int)); //ha quanto tempo o programa esta rodando
-    *runTime = 0;
+    int runTime = 0;  //ha quanto tempo o programa esta rodando
     int tam  = get_line_size(fila); //tamanho total da linked list, e da quantidade de elementos possiveis a serem passados por parametro para o escalonador
     lever = 0; //booleana para verificar se ja ha pelo menos 1 elemento na RR
 
     El* target = NULL; //alvo  a ser retirado da LL e inserido da RR
     Fila *RR; // lista round-robin, com todos os processos na fila de prontos no momento
 
+    print_line(fila);
+
     printf("tempo total de execucao: %d\n!!!!!!!!!!!\n",tempoTotalExec);
 
+    int id1 = shmget(IPC_PRIVATE,sizeof(int) * tam , IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); //alocando memoria compartilhada
 
-    // TIRAR ESSE COMENTARIO
+    int* pids = shmat(id1,0,0); //lista de todos os pids que foram inicializados. usamos isso para mandar os sinais aos processos || attach na memoria compartilhada
+    int* p_names = (int*) malloc(sizeof(int)*tam);
+
+    zero_array(p_names,tam); 
+    zero_array(pids,tam);
+
+    get_names(p_names,fila);//passa os nomes da LL para um array de nomes
 
     int escalonador = fork();
 
@@ -344,30 +402,30 @@ int main(void){
 
             if(lever == 0){//se nao houver nenhum elemento na RR;
                 RR = create_line(target);
+                lever++;
             }else{ //se houver ao menos um elemento na RR
                 insert_on_line(RR,target);
             }
         }
 
-        go_robin(RR);
+        go_robin(RR,pids,p_names,tam);
 
-        sleep(1);
+        //sleep(1);
 
-        *runTime++;//+1 segundo
+        runTime++;//+1 segundo
     }
         /*      faz chamadas ao escalonador         */
 
     //faz fork, e faz chamadas ao escalonador para ele inserir na paradinha do lance
 
-    //TIRAR ESSE COMENTARIO 
-
     print_line(fila);
 
     //printf("Hello world!\n");
     
+    shmctl(id1,IPC_RMID,0); //libera a memória alocada previamente a partir do id associado a ela
     fclose(f);
-    free(runTime);
-    free_line(fila); //libera os mallocs todos
+    //free(runTime);
+    //free_line(fila); //libera os mallocs todos
 
     return 0;
 }
