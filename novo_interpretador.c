@@ -241,8 +241,8 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     }
     loop3 = candidatos;
 
-    printf("FILA DE CANDIDATOS: \n");
-    print_line(loop3);
+    //printf("FILA DE CANDIDATOS: \n");
+    //print_line(loop3);
 
     while(loop3 != NULL){ //verifica se ha alguem com a mao abaixada (ou seja, se alguem de maior prioridade nao tiver sido selecionado nesta rodada)
         if(get_line_size(candidatos) == 1){
