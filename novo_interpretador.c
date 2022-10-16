@@ -9,6 +9,10 @@
 #include <sys/stat.h>
 
 #define PATH "./testes/programs/"
+#define START 0
+#define CONT 1
+#define STOP 2
+#define TERM 3
 
 /*
 João Victor Godinho Woitschach - 2011401
@@ -24,12 +28,13 @@ struct el {
     int name, prio, tempo_init, tempo_total, minha_vez, tempo_atual;
 };
 
+typedef struct el El;
+
 struct fila{
-    struct el *curr;
+    El *curr;
     struct fila *prox;
 };
 
-typedef struct el El;
 typedef struct fila Fila;
 
 
@@ -53,6 +58,17 @@ void print_el(El* f){
     printf("tempo total: %d\n",f->tempo_total);
     printf("minha vez: %d\n",f->minha_vez);
     
+}
+
+void copy_el(El* from, El* to){
+
+    to->name = from->name;
+    to->prio = from->prio;
+    to->tempo_atual = from->tempo_atual;
+    to->tempo_init = from->tempo_init;
+    to->tempo_total = from->tempo_total;
+    to->minha_vez = from->minha_vez;
+
 }
 
 void print_line(Fila* f){//coe maluco
@@ -110,10 +126,17 @@ int get_tempoExecTotal(Fila* f){
 }
 
 El* next_off(Fila* f, int tempo_atual){//TESTAR PARA VER SE FUNCIONA || seleciona o proximo a sair da LL
-    
+
+    if(f == NULL){
+        return NULL;
+    }
+
     while(f!=NULL){
-        if(f->curr->tempo_init == tempo_atual)
-            return f->curr;
+        if(f->curr->tempo_init == tempo_atual){
+            El* target = (El*) malloc(sizeof(El));
+            copy_el(f->curr,target);
+            return target;
+        }
         f = f->prox;
     }
 
@@ -176,17 +199,6 @@ void hands_down(Fila *f){// COPIAR E COLAR NO CODIGO ANTIGO! ||TESTADO E FUNCION
     }
 }
 
-void copy_el(El* from, El* to){
-
-    to->name = from->name;
-    to->prio = from->prio;
-    to->tempo_atual = from->tempo_atual;
-    to->tempo_init = from->tempo_init;
-    to->tempo_total = from->tempo_total;
-    to->minha_vez = from->minha_vez;
-
-}
-
 El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO || procura pelo proximo elemento da round robin de maior prioridade 
 
     int lowest_prio; //maior prioridade encontrada ate entao
@@ -197,7 +209,7 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     Fila *loop1, *loop2, *loop3;
     loop1 = RR, loop2 = RR;
 
-    El* escolhido = (El*) malloc(sizeof(El));
+    El* escolhido; //escolhido para ser o da vez vide a RR atual
 
     while(loop1 != NULL){ //procura pela maior prioridade
 
@@ -217,8 +229,7 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
         
         if(loop2->curr->prio == lowest_prio){
             
-            El* qg = (El*) malloc(sizeof(El));
-            copy_el(loop2->curr,qg);
+            El* qg = loop2->curr;
 
             if(lever == 0){
                 candidatos = create_line(qg);
@@ -234,25 +245,31 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     //print_line(loop3);
 
     while(loop3 != NULL){ //verifica se ha alguem com a mao abaixada (ou seja, se alguem de maior prioridade nao tiver sido selecionado nesta rodada)
-        if(loop3->curr->minha_vez == 0){
+        if(get_line_size(candidatos) == 1){
+            candidatos->curr->minha_vez = 1;
+            return candidatos->curr;
+        }
 
-            copy_el(loop3->curr,escolhido); //PODE DAR ERRO || copia o conteudo do no da LL candidatos
-            candidatos = remove_of_line(candidatos,loop3->curr);
-            //free_line(candidatos); //libera a LL candidatos
+        else if(loop3->curr->minha_vez == 0){
+
+            escolhido = loop3->curr;
+            escolhido->minha_vez = 1;
+
             return escolhido;
         }
         loop3 = loop3->prox;
     }
-
+    /*
     if(loop3 == NULL){
         printf("ERRO NA FIND PRIO\n");
         exit(1);
     }
-
+    */
     hands_down(candidatos); //se todos estiverem com as maos levantadas, abaixa todas elas...
 
-    copy_el(candidatos->curr,escolhido); //... e seleciona o primeiro da LL arbitrariamente || ISSO PODE GERAR RESULTADOS INESPERADOS, PQ EU NAO ESTOU DEFININDO EXATAMENTE QUEM DEVE ENTRAR QUE HORA NO PROGRAMA!!!
-    //free_line(candidatos);
+    escolhido = candidatos->curr;
+    //  copy_el(candidatos->curr,escolhido); //... e seleciona o primeiro da LL arbitrariamente || ISSO PODE GERAR RESULTADOS INESPERADOS, PQ EU NAO ESTOU DEFININDO EXATAMENTE QUEM DEVE ENTRAR QUE HORA NO PROGRAMA!!!
+    //free_line(candidatos); || NAO PODEMOS DAR FREE NESSES CARAS AQUI, PQ ELES SAO REFERNCIAS AOS ELEMENTOS DA LL ORIGINAL
 
     //printf("NOVA FILA RR: \n");
     //print_line(RR);
@@ -262,18 +279,33 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
 
 char* program_name(int int_name){
 
-    char* ponto_barra = (char*) malloc(sizeof(char)*4); //  ./ + null
-    strcpy(ponto_barra, "./");
+        //msg("******************");
 
-    char* numero = (char*) malloc(sizeof(char)*2);
-    numero[0] = int_name + '0';
-    numero[1] = '\0';
+        char* ponto_barra = (char*) malloc(sizeof(char)*4); //  ./ + null
+        ponto_barra[0] = '.';
+        ponto_barra[1] = '/';
+        ponto_barra[2] = ' ';
+        ponto_barra[3] = '\0';
 
-    strcpy(ponto_barra,numero);
-    //free(numero);
+        strcpy(ponto_barra, "./");
+        //printf("ponto barra: %s\n",ponto_barra);
 
-    return ponto_barra;
-}
+        char* numero = (char*) malloc(sizeof(char)*2);
+        numero[0] = int_name + '0';
+        numero[1] = '\0';
+
+        //printf("numero: %s\n",numero);
+
+        strcat(ponto_barra,numero);
+        //free(numero);
+
+
+        //printf("nome do programa: %s\n",ponto_barra);
+
+        //msg("******************");
+
+        return ponto_barra;
+    }
 
 int search_name(int* v, int tam, int target){
 
@@ -291,32 +323,93 @@ int get_index(int *v, int tam, int target){
     return -1; //nao foi encontrado o nome target
 }
 
+void msg(char* s){
+    printf("%s\n",s);
+}
+
+void status(El* now, int state){
+
+    if(state == START)
+        printf("PROCESSO p%d FOI INICIADO. %d SEGUNDOS RESTANTES...\n",now->name, now->tempo_total - now->tempo_atual);
+    else if(state == CONT)
+        printf("PROCESSO p%d FOI CONTINUADO. %d SEGUNDOS RESTANTES...\n",now->name, now->tempo_total - now->tempo_atual);
+    else if(state == STOP)
+        printf("PROCESSO p%d FOI INTERROMPIDO. %d SEGUNDOS RESTANTES...\n",now->name, now->tempo_total - now->tempo_atual);
+    else if(state == TERM)
+        printf("PROCESSO p%d FOI TERMINADO. %d SEGUNDOS RESTANTES...\n",now->name, now->tempo_total - now->tempo_atual);
+}
+
+
 void go_robin(Fila *RR, int* pids, int* p_names, int tam){/* TESTAR || funcao do escalonador efetivamente */
 
     El* next;
+    printf("INICIO DE GO ROBIN\n");
 
+    //int lever = 0;
     next = find_prio(RR);
+
     char* to_run = program_name(next->name); // "./<numero_do_programa>"
     int i = get_index(p_names,tam,next->name);
-    int pid = fork();
+    
+    int child_process_pid;
 
+    if(pids[i] == 0){ //caso o processo nao tenha sido iniciado...
+        child_process_pid= fork();
 
-    if(pid > 0){ 
-        if(pids[i] == 0){ //se o processo, nao tiver sido executado...
+        if(child_process_pid == 0){//novo processo
+
+            //printf("PROCESSO p%d ALOCADO EM PIDS\n",next->name);
+            status(next,START);
             execlp(to_run,to_run,NULL);
-        }else if(pids[i] > 0){
-            kill(pids[i],SIGCONT);
+
+        }else if(child_process_pid > 0){//processo RR main aguarda 1 segundo, e sigstop
+            next->tempo_atual++;
+            pids[i] = child_process_pid;
+
+            //printf("PAI DE p%d AGUARDANDO SUA EXECUCAO\n",next->name);
+            sleep(1);
+            if(next->tempo_atual >= next->tempo_total){//caso o tempo tenha acabado, sigterm
+
+                //printf("PAI DE p%d ENVIA SIGTERM PARA p%d (pid: %d)\n",next->name,next->name,pids[i]);
+                status(next,TERM);
+                kill(pids[i],SIGTERM);
+                RR = remove_of_line(RR,next);
+                
+
+            } else{//caso nao tenha acabado, manda o um SIGSTOP
+                
+                //printf("PAI DE p%d ENVIA SIGSTOP PARA p%d (pid: %d)\n",next->name,next->name,pids[i]);
+                status(next,STOP);
+                kill(pids[i],SIGSTOP);
+                
+            }
         }
 
-        if(next->tempo_atual >= next->tempo_total)
-            kill(pids[i],SIGTERM);
-    }else{ //espera pela exec do processo
-        sleep(1); //aguarda 1 segundo
-        kill(pids[i],SIGSTOP);
-        
-    }
-}
+    }else if(pids[i] > 0){//caso o processo tenha se iniciado
 
+        //printf("PROCESSO p%d JA EXISTIA EM PIDS",next->name);
+
+        kill(pids[i],SIGCONT);
+        status(next,CONT);
+        next->tempo_atual++;
+        sleep(1);
+
+        if(next->tempo_atual >= next->tempo_total){
+            //printf("PAI DE p%d ENVIA SIGTERM PARA p%d (pid: %d)\n",next->name,next->name,pids[i]);
+            kill(pids[i],SIGTERM);
+            status(next,TERM);
+            RR = remove_of_line(RR,next);
+        }else{
+            //printf("PAI DE p%d ENVIA SIGSTOP PARA p%d (pid: %d)\n",next->name,next->name,pids[i]);
+            kill(pids[i],SIGSTOP);
+            status(next,STOP);
+        }
+
+    }
+    
+    printf("FIM DA EXECUCAO DE RR PARA p%d\n",next->name);
+
+}
 
 void zero_array(int *v, int tam){ //limpa o lixo de memoria de um array 
     for(int i = 0; i<tam; i++) v[i] = 0;
@@ -390,23 +483,25 @@ int main(void){
 
     get_names(p_names,fila);//passa os nomes da LL para um array de nomes
 
-    int escalonador = fork();
-
-    El* next; //elemento a ser inserido neste segundo na lista
 
 
-    while(runTime != tempoTotalExec){ //CADA ITERACAO REPRESENTA 1 SEGUNDO!!!
+    while(runTime < tempoTotalExec){ //CADA ITERACAO REPRESENTA 1 SEGUNDO!!!
+        printf("--> SEGUNDO %d\n",runTime);
+
         while(next_off(fila,runTime) != NULL){//enquanto houverem elementos a serem inseridos neste segundo:
-            target = next_off(fila,runTime); //pega o elemento alvo
-            fila = remove_of_line(fila,target); //remove ele da LL
+            target = next_off(fila,runTime); //pega uma COPIA do endereco alvo
 
+            fila = remove_of_line(fila,target); //remove um elemento da LL com o MESMO NOME do elemento alvo
+            
             if(lever == 0){//se nao houver nenhum elemento na RR;
                 RR = create_line(target);
                 lever++;
             }else{ //se houver ao menos um elemento na RR
                 insert_on_line(RR,target);
             }
+
         }
+        //print_line(RR);
 
         go_robin(RR,pids,p_names,tam);
 
@@ -414,11 +509,16 @@ int main(void){
 
         runTime++;//+1 segundo
     }
-        /*      faz chamadas ao escalonador         */
+    
+    for(int i = 0; i<tam; i++){
+        kill(pids[i],SIGKILL);
+        printf("MATEI O PROGRAMA de pid: %d\n",pids[i]);
+    }
+
 
     //faz fork, e faz chamadas ao escalonador para ele inserir na paradinha do lance
 
-    print_line(fila);
+    //print_line(fila);
 
     //printf("Hello world!\n");
     
