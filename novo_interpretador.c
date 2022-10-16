@@ -241,8 +241,8 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
     }
     loop3 = candidatos;
 
-    //printf("FILA DE CANDIDATOS: \n");
-    //print_line(loop3);
+    printf("FILA DE CANDIDATOS: \n");
+    print_line(loop3);
 
     while(loop3 != NULL){ //verifica se ha alguem com a mao abaixada (ou seja, se alguem de maior prioridade nao tiver sido selecionado nesta rodada)
         if(get_line_size(candidatos) == 1){
@@ -257,6 +257,7 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
 
             return escolhido;
         }
+
         loop3 = loop3->prox;
     }
     /*
@@ -265,9 +266,10 @@ El* find_prio(Fila *RR){// TROCAR PARA O ARQUIVO NORMAL||TESTADO E FUNCIONANDO |
         exit(1);
     }
     */
-    hands_down(candidatos); //se todos estiverem com as maos levantadas, abaixa todas elas...
-
+ //se todos estiverem com as maos levantadas, abaixa todas elas...
+    hands_down(candidatos);
     escolhido = candidatos->curr;
+    escolhido->minha_vez = 1;
     //  copy_el(candidatos->curr,escolhido); //... e seleciona o primeiro da LL arbitrariamente || ISSO PODE GERAR RESULTADOS INESPERADOS, PQ EU NAO ESTOU DEFININDO EXATAMENTE QUEM DEVE ENTRAR QUE HORA NO PROGRAMA!!!
     //free_line(candidatos); || NAO PODEMOS DAR FREE NESSES CARAS AQUI, PQ ELES SAO REFERNCIAS AOS ELEMENTOS DA LL ORIGINAL
 
@@ -524,8 +526,9 @@ int main(void){
     
     shmctl(id1,IPC_RMID,0); //libera a memória alocada previamente a partir do id associado a ela
     fclose(f);
-    //free(runTime);
-    //free_line(fila); //libera os mallocs todos
+
+    free_line(fila); //libera os mallocs todos
+    free_line(RR);
 
     return 0;
 }
